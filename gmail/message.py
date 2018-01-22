@@ -8,7 +8,6 @@ from imaplib import ParseFlags
 
 class Message():
 
-
     def __init__(self, mailbox, uid):
         self.uid = uid
         self.mailbox = mailbox
@@ -34,9 +33,9 @@ class Message():
         self.thread_id = None
         self.thread = []
         self.message_id = None
- 
+
         self.attachments = None
-        
+
 
 
     def is_read(self):
@@ -124,18 +123,18 @@ class Message():
     def parse_labels(self, headers):
         if re.search(r'X-GM-LABELS \(([^\)]+)\)', headers):
             labels = re.search(r'X-GM-LABELS \(([^\)]+)\)', headers).groups(1)[0].split(' ')
-            return map(lambda l: l.replace('"', '').decode("string_escape"), labels)
+            return list(map(lambda l: l.replace('\"', ''), labels))
         else:
             return list()
 
     def parse_subject(self, encoded_subject):
         dh = decode_header(encoded_subject)
         default_charset = 'ASCII'
-        return ''.join([ unicode(t[0], t[1] or default_charset) for t in dh ])
+        return ''.join([ str(t[0], t[1] or default_charset) for t in dh ])
 
     def parse(self, raw_message):
-        raw_headers = raw_message[0]
-        raw_email = raw_message[1]
+        raw_headers = raw_message[0].decode()
+        raw_email = raw_message[1].decode()
 
         self.message = email.message_from_string(raw_email)
         self.headers = self.parse_headers(self.message)
@@ -144,7 +143,7 @@ class Message():
         self.fr = self.message['from']
         self.delivered_to = self.message['delivered_to']
 
-        self.subject = self.parse_subject(self.message['subject'])
+        self.subject = self.message['subject']
 
         if self.message.get_content_maintype() == "multipart":
             for content in self.message.walk():
@@ -157,7 +156,7 @@ class Message():
 
         self.sent_at = datetime.datetime.fromtimestamp(time.mktime(email.utils.parsedate_tz(self.message['date'])[:9]))
 
-        self.flags = self.parse_flags(raw_headers)
+        self.flags = self.parse_flags(raw_headers.encode())
 
         self.labels = self.parse_labels(raw_headers)
 
@@ -166,18 +165,17 @@ class Message():
         if re.search(r'X-GM-MSGID (\d+)', raw_headers):
             self.message_id = re.search(r'X-GM-MSGID (\d+)', raw_headers).groups(1)[0]
 
-        
+
         # Parse attachments into attachment objects array for this message
         self.attachments = [
             Attachment(attachment) for attachment in self.message._payload
-                if not isinstance(attachment, basestring) and attachment.get('Content-Disposition') is not None
+                if not isinstance(attachment, str) and attachment.get('Content-Disposition') is not None
         ]
-        
+
 
     def fetch(self):
         if not self.message:
-            response, results = self.gmail.imap.uid('FETCH', self.uid, '(BODY.PEEK[] FLAGS X-GM-THRID X-GM-MSGID X-GM-LABELS)')
-
+            response, results = self.gmail.imap.uid('FETCH', self.uid, b'(BODY.PEEK[] FLAGS X-GM-THRID X-GM-MSGID X-GM-LABELS)')
             self.parse(results[0])
 
         return self.message
@@ -186,10 +184,12 @@ class Message():
     def fetch_thread(self):
         self.fetch()
         original_mailbox = self.mailbox
+
         self.gmail.use_mailbox(original_mailbox.name)
 
         # fetch and cache messages from inbox or other received mailbox
         response, results = self.gmail.imap.uid('SEARCH', None, '(X-GM-THRID ' + self.thread_id + ')')
+        results[0] = results[0].decode()
         received_messages = {}
         uids = results[0].split(' ')
         if response == 'OK':
@@ -198,14 +198,18 @@ class Message():
             self.mailbox.messages.update(received_messages)
 
         # fetch and cache messages from 'sent'
-        self.gmail.use_mailbox('[Gmail]/Sent Mail')
+
+        self.gmail.use_mailbox(b'[Gmail]/Sent Mail')
         response, results = self.gmail.imap.uid('SEARCH', None, '(X-GM-THRID ' + self.thread_id + ')')
+        results[0] = results[0].decode()
+
         sent_messages = {}
         uids = results[0].split(' ')
         if response == 'OK':
-            for uid in uids: sent_messages[uid] = Message(self.gmail.mailboxes['[Gmail]/Sent Mail'], uid)
+
+            for uid in uids: sent_messages[uid] = Message(self.gmail.mailboxes[b'[Gmail]/Sent Mail'], uid)
             self.gmail.fetch_multiple_messages(sent_messages)
-            self.gmail.mailboxes['[Gmail]/Sent Mail'].messages.update(sent_messages)
+            self.gmail.mailboxes[b'[Gmail]/Sent Mail'].messages.update(sent_messages)
 
         self.gmail.use_mailbox(original_mailbox.name)
 

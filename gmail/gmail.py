@@ -1,9 +1,8 @@
 import re
 import imaplib
 
-from mailbox import Mailbox
-from utf import encode as encode_utf7, decode as decode_utf7
-from exceptions import *
+from .mailbox import Mailbox
+
 
 class Gmail():
     # GMail IMAP defaults
@@ -53,19 +52,23 @@ class Gmail():
         response, mailbox_list = self.imap.list()
         if response == 'OK':
             for mailbox in mailbox_list:
-                mailbox_name = mailbox.split('"/"')[-1].replace('"', '').strip()
+                mailbox_name = mailbox.split(b'\"/\"')[-1].replace(b'\"', b'').strip()
                 mailbox = Mailbox(self)
                 mailbox.external_name = mailbox_name
                 self.mailboxes[mailbox_name] = mailbox
 
     def use_mailbox(self, mailbox):
         if mailbox:
+            if isinstance(mailbox, str):
+                mailbox = mailbox.encode('utf-8')
+            else:
+                mailbox = mailbox
             self.imap.select(mailbox)
         self.current_mailbox = mailbox
 
     def mailbox(self, mailbox_name):
         if mailbox_name not in self.mailboxes:
-            mailbox_name = encode_utf7(mailbox_name)
+            mailbox_name = mailbox_name.encode('utf-8')
         mailbox = self.mailboxes.get(mailbox_name)
 
         if mailbox and not self.current_mailbox == mailbox_name:
@@ -140,7 +143,7 @@ class Gmail():
         box = self.mailbox(mailbox_name)
         return box.mail(**kwargs)
 
-    
+
     def copy(self, uid, to_mailbox, from_mailbox=None):
         if from_mailbox:
             self.use_mailbox(from_mailbox)
@@ -148,11 +151,11 @@ class Gmail():
 
     def fetch_multiple_messages(self, messages):
         fetch_str =  ','.join(messages.keys())
-        response, results = self.imap.uid('FETCH', fetch_str, '(BODY.PEEK[] FLAGS X-GM-THRID X-GM-MSGID X-GM-LABELS)')
-        for index in xrange(len(results) - 1):
+        response, results = self.imap.uid('FETCH', fetch_str, b'(BODY.PEEK[] FLAGS X-GM-THRID X-GM-MSGID X-GM-LABELS)')
+        for index in range(len(results) - 1):
             raw_message = results[index]
-            if re.search(r'UID (\d+)', raw_message[0]):
-                uid = re.search(r'UID (\d+)', raw_message[0]).groups(1)[0]
+            if re.search(r'UID (\d+)', raw_message[0].decode()):
+                uid = re.search(r'UID (\d+)', raw_message[0].decode()).groups(1)[0]
                 messages[uid].parse(raw_message)
 
         return messages
@@ -161,26 +164,26 @@ class Gmail():
     def labels(self, require_unicode=False):
         keys = self.mailboxes.keys()
         if require_unicode:
-            keys = [decode_utf7(key) for key in keys]
+            keys = [key.decode('utf-8') for key in keys]
         return keys
 
     def inbox(self):
-        return self.mailbox("INBOX")
+        return self.mailbox(b"INBOX")
 
     def spam(self):
-        return self.mailbox("[Gmail]/Spam")
+        return self.mailbox(b"[Gmail]/Spam")
 
     def starred(self):
-        return self.mailbox("[Gmail]/Starred")
+        return self.mailbox(b"[Gmail]/Starred")
 
     def all_mail(self):
-        return self.mailbox("[Gmail]/All Mail")
+        return self.mailbox(b"[Gmail]/All Mail")
 
     def sent_mail(self):
-        return self.mailbox("[Gmail]/Sent Mail")
+        return self.mailbox(b"[Gmail]/Sent Mail")
 
     def important(self):
-        return self.mailbox("[Gmail]/Important")
+        return self.mailbox(b"[Gmail]/Important")
 
     def mail_domain(self):
-        return self.username.split('@')[-1]
+        return self.username.split(b'@')[-1]

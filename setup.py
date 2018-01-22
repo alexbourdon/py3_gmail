@@ -9,14 +9,14 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name = "gmail",
-    version = "0.0.5",
-    author = "Charlie Guo",
+    name = "py3_gmail",
+    version = "0.0.1",
+    author = "Alex Bourdon",
     author_email = "FIXME",
     description = ("A Pythonic interface for Google Mail."),
     license = "MIT",
     keywords = "google gmail",
-    url = "https://github.com/charlierguo/gmail",
+    url = "https://github.com/alexbourdon/py3_gmail",
     packages=['gmail'],
     long_description=read('README.md'),
     classifiers=[

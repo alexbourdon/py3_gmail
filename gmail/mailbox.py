@@ -1,5 +1,4 @@
-from message import Message
-from utf import encode as encode_utf7, decode as decode_utf7
+from .message import Message
 
 
 class Mailbox():
@@ -13,14 +12,14 @@ class Mailbox():
     @property
     def external_name(self):
         if "external_name" not in vars(self):
-            vars(self)["external_name"] = encode_utf7(self.name)
+            vars(self)["external_name"] = self.name.encode('utf-8')
         return vars(self)["external_name"]
 
     @external_name.setter
     def external_name(self, value):
         if "external_name" in vars(self):
             del vars(self)["external_name"]
-        self.name = decode_utf7(value)
+        self.name = value.decode('utf-8')
 
     def mail(self, prefetch=False, **kwargs):
         search = ['ALL']
@@ -59,8 +58,8 @@ class Mailbox():
         emails = []
         # print search
         response, data = self.gmail.imap.uid('SEARCH', *search)
-        if response == 'OK':    
-            uids = filter(None, data[0].split(' ')) # filter out empty strings
+        if response == 'OK':
+            uids = filter(None, data[0].split(b' ')) # filter out empty strings
 
             for uid in uids:
                 if not self.messages.get(uid):
@@ -79,8 +78,8 @@ class Mailbox():
     def threads(self, prefetch=False, **kwargs):
         emails = []
         response, data = self.gmail.imap.uid('SEARCH', 'ALL')
-        if response == 'OK':    
-            uids = data[0].split(' ') 
+        if response == 'OK':
+            uids = data[0].split(' ')
 
 
             for uid in uids:
